@@ -1,21 +1,32 @@
 trigger:
   branches:
     include:
-      - main  # O la rama que uses
+      - main  # o 'master' según tu repositorio
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  dockerImageName: 'my-ci-image'
+  dockerImageName: 'ci-node-app'
   dockerTag: 'ci-$(Build.BuildId)'
 
 steps:
-  - task: DockerInstaller@0
-    displayName: '🔧 Instalar Docker'
+  # ✅ Mostrar rama actual
+  - script: |
+      echo "✅ Ejecutando en rama: $(Build.SourceBranch)"
+    displayName: 'Mostrar rama actual'
 
+  # 🔍 Diagnóstico inicial
+  - script: |
+      echo "🔍 Verificando entorno"
+      docker --version
+      node --version
+      npm --version
+    displayName: 'Diagnóstico inicial'
+
+  # 🐳 Construir imagen Docker (usando Dockerfile multistage)
   - task: Docker@2
-    displayName: '🐳 Build imagen Docker (solo CI)'
+    displayName: '🐳 Build imagen Docker'
     inputs:
       command: 'build'
       repository: '$(dockerImageName)'
@@ -23,6 +34,22 @@ steps:
       tags: |
         $(dockerTag)
 
+  # 🧪 Ejecutar pruebas dentro del contenedor (requiere script "test" en package.json)
   - script: |
       docker run --rm $(dockerImageName):$(dockerTag) npm test
-    displayName: '🧪 Ejecutar pruebas dentro del contenedor'
+    displayName: '🧪 Ejecutar pruebas en contenedor'
+
+  # 📈 Publicar cobertura (si existe el archivo cobertura)
+  - task: PublishCodeCoverageResults@2
+    condition: succeededOrFailed()
+    displayName: '📈 Publicar cobertura (si aplica)'
+    inputs:
+      codeCoverageTool: 'Cobertura'
+      summaryFileLocation: 'coverage/cobertura-coverage.xml'
+
+  # 📄 Mostrar logs si hay fallo
+  - script: |
+      docker ps -a
+      docker logs $(docker ps -aqf "ancestor=$(dockerImageName):$(dockerTag)" || true)
+    displayName: '📄 Mostrar logs del contenedor'
+    condition: failed()
