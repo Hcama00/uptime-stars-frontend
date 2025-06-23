@@ -6,6 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
+    "test": "echo \"Sin pruebas aún\" && exit 0",
     "lint": "next lint"
   },
   "dependencies": {
