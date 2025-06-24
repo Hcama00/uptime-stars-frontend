@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - main  # o 'master' según tu repositorio
+      - main
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -24,6 +24,22 @@ steps:
       npm --version
     displayName: 'Diagnóstico inicial'
 
+  # 🟦 Instalar Sonar Scanner (Node.js)
+  - script: |
+      npm install -g sonar-scanner
+    displayName: '🟦 Instalar sonar-scanner'
+
+  # 🟦 Ejecutar análisis SonarCloud (asegúrate de que SONAR_* están en tu Library)
+  - script: |
+      sonar-scanner \
+        -Dsonar.projectKey=$(SONAR_PROJECT_KEY) \
+        -Dsonar.organization=$(SONAR_ORGANIZATION) \
+        -Dsonar.sources=. \
+        -Dsonar.exclusions=node_modules/**,**/*.test.js,**/__tests__/** \
+        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+        -Dsonar.login=$(SONAR_TOKEN)
+    displayName: '🟦 Análisis de calidad SonarCloud'
+
   # 🐳 Construir imagen Docker (usando Dockerfile multistage)
   - task: Docker@2
     displayName: '🐳 Build imagen Docker'
@@ -34,12 +50,12 @@ steps:
       tags: |
         $(dockerTag)
 
-  # 🧪 Ejecutar pruebas dentro del contenedor (requiere script "test" en package.json)
+  # 🧪 Ejecutar pruebas dentro del contenedor
   - script: |
       docker run --rm $(dockerImageName):$(dockerTag) npm test
     displayName: '🧪 Ejecutar pruebas en contenedor'
 
-  # 📈 Publicar cobertura (si existe el archivo cobertura)
+  # 📈 Publicar cobertura
   - task: PublishCodeCoverageResults@2
     condition: succeededOrFailed()
     displayName: '📈 Publicar cobertura (si aplica)'
