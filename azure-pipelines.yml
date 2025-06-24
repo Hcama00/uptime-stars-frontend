@@ -7,8 +7,15 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  dockerImageName: 'ci-node-app'
-  dockerTag: 'ci-$(Build.BuildId)'
+  - group: SonarCloudSecrets             # 🔒 Solo contiene SONAR_TOKEN
+  - name: SONAR_PROJECT_KEY
+    value: 'uptimestars'                 # 🟡 Definido directamente en pipeline
+  - name: SONAR_ORGANIZATION
+    value: 'mi-organizacion'            # 🟡 Definido directamente en pipeline
+  - name: dockerImageName
+    value: 'ci-node-app'
+  - name: dockerTag
+    value: 'ci-$(Build.BuildId)'
 
 steps:
   # ✅ Mostrar rama actual
@@ -24,24 +31,26 @@ steps:
       npm --version
     displayName: 'Diagnóstico inicial'
 
-  # 🟦 Instalar Sonar Scanner (Node.js)
+  # 🟦 Instalar Sonar Scanner
   - script: |
       npm install -g sonar-scanner
     displayName: '🟦 Instalar sonar-scanner'
 
-  # 🟦 Ejecutar análisis SonarCloud (asegúrate de que SONAR_* están en tu Library)
+  # 🟦 Ejecutar análisis SonarCloud (mezcla de pipeline + library)
   - script: |
       sonar-scanner \
-      -Dsonar.projectKey=$(SONAR_PROJECT_KEY) \
-      -Dsonar.organization=$(SONAR_ORGANIZATION) \
-      -Dsonar.host.url=https://sonarcloud.io \
-      -Dsonar.sources=. \
-      -Dsonar.exclusions=node_modules/**,**/*.test.js,**/__tests__/** \
-      -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-      -Dsonar.login="${SONAR_TOKEN}"
+        -Dsonar.projectKey=$(SONAR_PROJECT_KEY) \
+        -Dsonar.organization=$(SONAR_ORGANIZATION) \
+        -Dsonar.host.url=https://sonarcloud.io \
+        -Dsonar.sources=. \
+        -Dsonar.exclusions=node_modules/**,**/*.test.js,**/__tests__/** \
+        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+        -Dsonar.login="${SONAR_TOKEN}"
     displayName: '🟦 Análisis de calidad SonarCloud'
+    env:
+      SONAR_TOKEN: $(SONAR_TOKEN)
 
-  # 🐳 Construir imagen Docker (usando Dockerfile multistage)
+  # 🐳 Construir imagen Docker
   - task: Docker@2
     displayName: '🐳 Build imagen Docker'
     inputs:
@@ -56,7 +65,7 @@ steps:
       docker run --rm $(dockerImageName):$(dockerTag) npm test
     displayName: '🧪 Ejecutar pruebas en contenedor'
 
-  # 📈 Publicar cobertura
+  # 📈 Publicar cobertura (opcional si se genera accesible fuera)
   - task: PublishCodeCoverageResults@2
     condition: succeededOrFailed()
     displayName: '📈 Publicar cobertura (si aplica)'
@@ -64,7 +73,7 @@ steps:
       codeCoverageTool: 'Cobertura'
       summaryFileLocation: 'coverage/cobertura-coverage.xml'
 
-  # 📄 Mostrar logs si hay fallo
+  # 📄 Mostrar logs si falla
   - script: |
       docker ps -a
       docker logs $(docker ps -aqf "ancestor=$(dockerImageName):$(dockerTag)" || true)
