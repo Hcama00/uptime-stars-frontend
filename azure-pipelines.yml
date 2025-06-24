@@ -8,10 +8,7 @@ pool:
 
 variables:
   - group: SonarCloudSecrets             # 🔒 Solo contiene SONAR_TOKEN
-  - name: SONAR_PROJECT_KEY
-    value: 'uptimestars'                 # 🟡 Definido directamente en pipeline
-  - name: SONAR_ORGANIZATION
-    value: 'mi-organizacion'            # 🟡 Definido directamente en pipeline
+
   - name: dockerImageName
     value: 'ci-node-app'
   - name: dockerTag
